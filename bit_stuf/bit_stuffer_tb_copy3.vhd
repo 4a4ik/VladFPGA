@@ -53,7 +53,7 @@ architecture Behavioral of bit_stuf_tb is
    signal n : integer range 0 to 9 := 0;
    signal zeros_number : integer range 0 to data_BW := 0;
    signal zeros_number_2 : integer range 0 to data_BW := 0;
-   signal ones_flag : std_logic_vector(0 downto 0) := "0"; -- Holds value for 1 clock cycle
+   signal ones_flag : std_logic_vector(0 downto 0) := "0";
    
    -- Control signals
    signal modulation_mode : std_logic_vector(2 downto 0) := (others=>'0'); -- Modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
@@ -64,14 +64,19 @@ architecture Behavioral of bit_stuf_tb is
    -- Output data
    signal tx_bit_stuf_tdata : std_logic_vector(data_BW-1 downto 0) := (others=>'0');
    signal tx_bit_ou : std_logic_vector(data_BW-1 downto 0) := (others=>'0');
-   signal tx_bit_ou_conc : std_logic_vector(19 downto 0) := (others=>'0'); -- Concatenated previous and current symbols
+   signal tx_bit_ou_conc : std_logic_vector(20 downto 0) := (others=>'0');
    signal tx_bit_ou_Rg : std_logic_vector(data_BW-1 downto 0) := (others=>'0');
    
 begin
 
-   tx_bit_ou_conc(19 downto 0) <= (tx_bit_ou_Rg(data_BW-1 downto 0) & tx_bit_ou(data_BW-1 downto 0));
+   tx_bit_ou_conc(20 downto 0) <= ("0" & (tx_bit_ou_Rg(data_BW-1 downto 0) & tx_bit_ou(data_BW-1 downto 0)));
    
    -- Main system clock signal generation
+   -- Cs_Ck_process :process  
+   -- begin
+      -- ckCs <= not(ckCs);
+      -- wait for Cs_Ck_Period/2;
+   -- end process;
       Cs_Ck_process : process  
    begin
       ckCs <= '1';
@@ -91,29 +96,44 @@ begin
  
       -- Main process
    process(ckCs)
-      variable ones_count : integer range 0 to 2*(data_BW-1) := 0;
+      variable ones_count : integer range 0 to data_BW := 0; -- Stores the number of found 1s
+      variable ones_count_2 : integer range 0 to 2*(data_BW-1) := 0;
    begin
       if rising_edge(ckCs) then
       if ckCe = '1' then
       
-       --  ones_flag <= "0";
          ones_count := 0;
-         for n in 0 to 2*(data_BW)-1 loop 
-            if ones_count = 7 then
-               ones_flag <= "1"; -- 7 1's in a row
-            else 
-               if tx_bit_ou_conc(n) = '1' then 
-                  ones_count := ones_count + 1;
-                else
-                  ones_count := 0;
-               end if;
-               ones_flag <= "0";
+         for n in 0 to 9 loop
+            if tx_bit_ou(n) = '1' then
+               ones_count := ones_count + 1;
+             else
+               ones_count := ones_count;
             end if;
          end loop;
+         
+         ones_count_2 := 0;
+         for n in 0 to 2*(data_BW)-1 loop
+            if ones_count_2 = 7 then
+               ones_flag <= "1";
+            else 
+               if tx_bit_ou_conc(n) = '1' then
+                  ones_count_2 := ones_count_2 + 1;
+                else
+                  ones_count_2 := 0;
+               end if;
+               ones_flag <= ones_flag;
+            end if;
+         end loop;
+         
+         -- if ones_count_2 >= 7 then
+            -- ones_flag(0 downto 0) <= "1";
+         -- else
+            -- ones_flag(0 downto 0) <= "0";
+         -- end if;
 
          --        Counter
-         -- < 0    ><"..">< count_range-1 >
-         -- <100..0><DATA><100...........0>
+         -- < "00" ><"01">< "10" >
+         -- <100..0><DATA><100..0>
          if packet_count(data_BW-1 downto 0) = conv_std_logic_vector(count_range-1,10)  then
             packet_count(data_BW-1 downto 0) <= (others=>'0');
          else
@@ -126,6 +146,20 @@ begin
          else
             packet_count_int <= packet_count_int + 1;
          end if;
+         
+         -- -- Choosing right output
+         -- case packet_count is
+            -- when  "00" => tx_bit_ou(data_BW-1 downto 0) <= "1" & ext("0", 9); 
+            -- when  "01" => tx_bit_ou(data_BW-1 downto 0) <= tx_bit_stuf_tdata(data_BW-1 downto 0); 
+            -- when others => tx_bit_ou(data_BW-1 downto 0) <= "1" & ext("0", 9);  
+         -- end case;
+         
+         -- -- Choosing right output
+         -- case packet_count(data_BW-1 downto 0) is
+            -- when ext("0", 10) => tx_bit_ou(data_BW-1 downto 0) <= "1" & ext("0", 9); 
+            -- when conv_std_logic_vector(count_range,10) => tx_bit_ou(data_BW-1 downto 0) <= "1" & ext("0", 9); 
+            -- when others => tx_bit_ou(data_BW-1 downto 0) <= tx_bit_stuf_tdata(data_BW-1 downto 0); 
+         -- end case;
          
           -- Choosing right output
          if packet_count(data_BW-1 downto 0) = ext("0", 10) then
@@ -140,7 +174,7 @@ begin
          -- PRBS 10-bit
          if packet_count(1 downto 0) = "01" then
             -- LFSR 10 bit
-            PRBS(data_BW-1 downto 0) <= PRBS(8 downto 0) & (PRBS(9 downto 9) xor PRBS(7 downto 7));
+            PRBS(data_BW-1 downto 0) <= PRBS(8 downto 0) & (PRBS(9 downto 9) XOR PRBS(7 downto 7));
          else
             PRBS(data_BW-1 downto 0) <= PRBS(data_BW-1 downto 0);
          end if;
@@ -160,9 +194,8 @@ begin
          
       end if;   
       end if;
-      
-      -- Output mapping
       zeros_number <= ones_count;
+      zeros_number_2 <= ones_count_2;
    end process;
 
    
