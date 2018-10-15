@@ -53,6 +53,13 @@ architecture Behavioral of bit_stuf_tb is
    signal tx_bit_ou : std_logic_vector(9 downto 0) := (others=>'0'); -- Output data
    signal tx_bit_stuf_tdata : std_logic_vector(9 downto 0) := (others=>'0');
    
+   -- UUT
+   signal arst_n : std_logic := '0';
+   signal rx_bit_stuf_tvalid : std_logic := '1';
+   signal rx_bit_stuf_send : std_logic := '0';
+   signal tx_bit_stuf_send : std_logic := '0';
+   signal tx_bit_stuf_tvalid : std_logic := '1';
+   
    
    ----------- State Machine Hardware ------------
    type FSMstates is (wait_st, sof_st, transf_st, stuff_st); -- FSM
@@ -223,100 +230,100 @@ begin
    end process;
    ---------------------------------------------------------------------------------------------------------------  
   
-   DataInput_process: process 
-   begin
+   -- DataInput_process: process 
+   -- begin
    
-      wait for (Cs_Ck_Period*10);
+      -- wait for (Cs_Ck_Period*10);
       
-      tx_bit_in(9 downto 0) <= (others=>'0');
-      tx_bit_in(9 downto 0) <= (others=>'1');
-      wait for (Cs_Ck_Period*10);
+      -- tx_bit_in(9 downto 0) <= (others=>'0');
+      -- tx_bit_in(9 downto 0) <= (others=>'1');
+      -- wait for (Cs_Ck_Period*10);
       
-      -- SOF
-      tx_bit_in(9 downto 0) <= SOF_const(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= EOF_const(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- SOF
+      -- tx_bit_in(9 downto 0) <= SOF_const(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= EOF_const(9 downto 0);
+      -- wait for Cs_Ck_Period;
       
-      -- Random data
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- Random data
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
 
-      -- Incoming constants
-      tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      wait for Cs_Ck_Period;
-      -- Duplicated, error should be 0
-      tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- Incoming constants
+      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- -- Duplicated, error should be 0
+      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
+      -- wait for Cs_Ck_Period;
       
-      -- Random data
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- Random data
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
       
-      -- Incoming constants
-      tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      wait for Cs_Ck_Period;
-      -- Duplicated, error should be 0
-      tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- Incoming constants
+      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- -- Duplicated, error should be 0
+      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
+      -- wait for Cs_Ck_Period;
       
-      -- Random data
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- Random data
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
 
-      -- Incoming constants, not duplicated, error should be 1
-      tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- Incoming constants, not duplicated, error should be 1
+      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
+      -- wait for Cs_Ck_Period;
 
-      -- Random data
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      wait for Cs_Ck_Period;
+      -- -- Random data
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
+      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+      -- wait for Cs_Ck_Period;
 
-      -- EOF
-      tx_bit_in(9 downto 0) <= SOF_const(9 downto 0);
-      wait for Cs_Ck_Period; 
-      tx_bit_in(9 downto 0) <= EOF_const(9 downto 0);
-      wait for Cs_Ck_Period;  
-      tx_bit_in(9 downto 0) <= (others=>'0');
-      wait for (Cs_Ck_Period*10);
+      -- -- EOF
+      -- tx_bit_in(9 downto 0) <= SOF_const(9 downto 0);
+      -- wait for Cs_Ck_Period; 
+      -- tx_bit_in(9 downto 0) <= EOF_const(9 downto 0);
+      -- wait for Cs_Ck_Period;  
+      -- tx_bit_in(9 downto 0) <= (others=>'0');
+      -- wait for (Cs_Ck_Period*10);
       
-      wait;
+      -- wait;
       
-   end process;
+   -- end process;
    
    
    DataOutput_process: process 
@@ -340,4 +347,18 @@ begin
       
    end process;
    
+   bit_stuffer: entity work.bit_stuff   
+   port map (
+             ckMain => ckCs,
+             arst_n => arst_n,                               -- asynchronous reset
+             modulation_mode => modulation_mode(0 downto 0), -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
+             send_data => tx_bit_ou(9 downto 0),    
+             rx_bit_stuf_send => ckPs,                       -- send data pulse, according to current bandwidth
+             rx_bit_stuf_tvalid  => rx_bit_stuf_tvalid,      -- tvalid from framer
+             rx_bit_stuf_tdata => rx_bit_stuf_tdata,         -- data from framer    
+             
+             tx_bit_stuf_send => tx_bit_stuf_send,           -- receive data pulse, according to current bandwidth
+             tx_bit_stuf_tvalid => tx_bit_stuf_tvalid,       -- tvalid from framer
+             tx_bit_stuf_tdata =>  tx_bit_in(9 downto 0));   -- data from framer); -- |out> Output from DSP wrapper 
+
 end Behavioral;
