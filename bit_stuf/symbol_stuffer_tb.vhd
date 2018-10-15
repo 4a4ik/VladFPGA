@@ -14,13 +14,13 @@ architecture Behavioral of bit_stuf_tb is
    constant Cs_Ck_Period : time:= 4 ns; -- Main clock period
    
    -- Start of file, end of file constants
-   signal SOF_const : std_logic_vector(9 downto 0) := "0000000001";
+   signal SOF_const : std_logic_vector(9 downto 0) := "0000000111";
    signal EOF_const : std_logic_vector(9 downto 0) := "0000001111";
    signal Data_const_1 : std_logic_vector(9 downto 0) := "0000000111";
    signal Data_const_2 : std_logic_vector(9 downto 0) := "0000001110";
    
    -- Clock signals
-   signal ckCs : std_logic := '0'; -- Main System Clock
+   signal ckCs : std_logic := '1'; -- Main System Clock
    signal ckCe : std_logic := '1'; -- Main System Clock Enable
    signal ckPs : std_logic := '0'; -- Pulse
    
@@ -28,7 +28,7 @@ architecture Behavioral of bit_stuf_tb is
    signal lfsr_ou : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
    
    -- Control signals
-   signal modulation_mode : std_logic_vector(2 downto 0) := "111"; -- Modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
+   signal modulation_mode : std_logic_vector(2 downto 0) := "000"; -- Modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
    signal transf_err : std_logic_vector(0 downto 0):="0";
    signal transf_flag : std_logic_vector(0 downto 0):="0";
    signal transf_flag_Rg1 : std_logic_vector(0 downto 0):="0";
@@ -50,11 +50,12 @@ architecture Behavioral of bit_stuf_tb is
    signal tx_bit_in_Conc_Rg2 : std_logic_vector(19 downto 0) := (others=>'0'); -- Storing previous & current values
    
    -- Output data
-   signal tx_bit_ou : std_logic_vector(9 downto 0) := (others=>'0'); -- Output data
+   signal tx_bit_ou : std_logic_vector(9 downto 0) := (9 => '1', others=>'0'); -- Output data
    signal tx_bit_stuf_tdata : std_logic_vector(9 downto 0) := (others=>'0');
    
    -- UUT
-   signal arst_n : std_logic := '0';
+   signal rx_bit_stuf_tdata : std_logic_vector(9 downto 0) := (others=>'0'); -- Output data
+   signal arst_n : std_logic := '1';
    signal rx_bit_stuf_tvalid : std_logic := '1';
    signal rx_bit_stuf_send : std_logic := '0';
    signal tx_bit_stuf_send : std_logic := '0';
@@ -65,42 +66,20 @@ architecture Behavioral of bit_stuf_tb is
    type FSMstates is (wait_st, sof_st, transf_st, stuff_st); -- FSM
    signal StVar : FSMstates := wait_st;
    
-   component bit_stuf is
-      Port ( ckMain : in STD_LOGIC;
-           arst_n: in STD_LOGIC;   -- asynchronous reset
-    
-           modulation_mode:  in STD_LOGIC_VECTOR(2 downto 0);     -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
-           send_data:        in std_logic;    
-           
-           rx_bit_stuf_send: out std_logic;                       -- send data pulse, according to current bandwidth
-           rx_bit_stuf_tvalid: in STD_LOGIC;                      -- tvalid from framer
-           rx_bit_stuf_tdata:  in STD_LOGIC_VECTOR(9 downto 0);   -- data from framer
-           
-           tx_bit_stuf_send: out std_logic;                       -- receive data pulse, according to current bandwidth
-           tx_bit_stuf_tvalid: out STD_LOGIC;                     -- tvalid from framer
-           tx_bit_stuf_tdata:  out STD_LOGIC_VECTOR(9 downto 0)   -- data from framer
-            );
-   end component;
-
    
 begin
-   
-   -- Main system clock signal generation
-      Cs_Ck_process : process  
-   begin
-      ckCs <= '1';
-      wait for Cs_Ck_Period/2;
-      ckCs <= '0';
-      wait for Cs_Ck_Period/2;
-   end process;
 
+
+   -- Clock generation
+   ckCs <= not ckCs after Cs_Ck_Period/2;
+   
       -- Main system clock signal generation
    Ps_Ck_process : process  
    begin
       ckPs <= '1';
-      wait for (Cs_Ck_Period/2);
+      wait for (Cs_Ck_Period);
       ckPs <= '0';
-      wait for (3)*(Cs_Ck_Period/2); -- Duty cycle, 3 for 1/4, 5 for 1/6 
+      wait for (1)*(Cs_Ck_Period); -- Duty cycle, 3 for 1/4, 5 for 1/6 
    end process;
    
       -- Main process, input analysis
@@ -333,11 +312,11 @@ begin
       
       -- Waiting
       mode_ou <= "0";
-      wait for (Cs_Ck_Period*10);
+      wait for (Cs_Ck_Period*9);
       
       -- SOF
       mode_ou <= "1";
-      wait for (Cs_Ck_Period*100);
+      wait for (Cs_Ck_Period*1);
       
       -- Waiting
       mode_ou <= "0";
@@ -347,17 +326,16 @@ begin
       
    end process;
    
-   bit_stuffer: entity work.bit_stuff   
+   symbol_stuffer_wrk: entity work.symbol_stuffer   
    port map (
              ckMain => ckCs,
              arst_n => arst_n,                               -- asynchronous reset
-             modulation_mode => modulation_mode(0 downto 0), -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
-             send_data => tx_bit_ou(9 downto 0),    
-             rx_bit_stuf_send => ckPs,                       -- send data pulse, according to current bandwidth
+             modulation_mode => modulation_mode, -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
+             send_data => ckPs,    
+             rx_bit_stuf_send => rx_bit_stuf_send,                       -- send data pulse, according to current bandwidth
              rx_bit_stuf_tvalid  => rx_bit_stuf_tvalid,      -- tvalid from framer
-             rx_bit_stuf_tdata => rx_bit_stuf_tdata,         -- data from framer    
+             rx_bit_stuf_tdata => tx_bit_ou,         -- data from framer    
              
-             tx_bit_stuf_send => tx_bit_stuf_send,           -- receive data pulse, according to current bandwidth
              tx_bit_stuf_tvalid => tx_bit_stuf_tvalid,       -- tvalid from framer
              tx_bit_stuf_tdata =>  tx_bit_in(9 downto 0));   -- data from framer); -- |out> Output from DSP wrapper 
 
