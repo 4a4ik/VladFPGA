@@ -24,6 +24,9 @@ architecture Behavioral of bit_stuf_tb is
    signal ckCe : std_logic := '1'; -- Main System Clock Enable
    signal ckPs : std_logic := '0'; -- Pulse
    
+   -- LFSR
+   signal lfsr_ou : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
+   
    -- Control signals
    signal modulation_mode : std_logic_vector(2 downto 0) := "111"; -- Modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
    signal transf_err : std_logic_vector(0 downto 0):="0";
@@ -34,6 +37,8 @@ architecture Behavioral of bit_stuf_tb is
    signal flag1 : std_logic_vector(0 downto 0):="0";
    signal flag_cnt : std_logic_vector(0 downto 0):="0";
    signal error_ou : std_logic_vector(0 downto 0):="0"; -- Error output
+   signal SOF_error : std_logic_vector(0 downto 0):="0"; -- Error at SOF
+   signal mode_ou : std_logic_vector(0 downto 0):="0"; -- Controls output values
    
    -- Input data
    signal tx_bit_in : std_logic_vector(9 downto 0) := (others=>'0'); -- Input data
@@ -44,12 +49,17 @@ architecture Behavioral of bit_stuf_tb is
    signal tx_bit_in_Conc_Rg1 : std_logic_vector(19 downto 0) := (others=>'0'); -- Storing previous & current values
    signal tx_bit_in_Conc_Rg2 : std_logic_vector(19 downto 0) := (others=>'0'); -- Storing previous & current values
    
+   -- Output data
+   signal tx_bit_ou : std_logic_vector(9 downto 0) := (others=>'0'); -- Output data
+   signal tx_bit_stuf_tdata : std_logic_vector(9 downto 0) := (others=>'0');
+   
+   
    ----------- State Machine Hardware ------------
    type FSMstates is (wait_st, sof_st, transf_st, stuff_st); -- FSM
    signal StVar : FSMstates := wait_st;
    
    component bit_stuf is
-    Port ( ckMain : in STD_LOGIC;
+      Port ( ckMain : in STD_LOGIC;
            arst_n: in STD_LOGIC;   -- asynchronous reset
     
            modulation_mode:  in STD_LOGIC_VECTOR(2 downto 0);     -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
@@ -62,8 +72,8 @@ architecture Behavioral of bit_stuf_tb is
            tx_bit_stuf_send: out std_logic;                       -- receive data pulse, according to current bandwidth
            tx_bit_stuf_tvalid: out STD_LOGIC;                     -- tvalid from framer
            tx_bit_stuf_tdata:  out STD_LOGIC_VECTOR(9 downto 0)   -- data from framer
-    );
-end bit_stuf;
+            );
+   end component;
 
    
 begin
@@ -83,10 +93,10 @@ begin
       ckPs <= '1';
       wait for (Cs_Ck_Period/2);
       ckPs <= '0';
-      wait for (5)*(Cs_Ck_Period/2); -- Duty cycle, 3 for 1/4, 5 for 1/6 
+      wait for (3)*(Cs_Ck_Period/2); -- Duty cycle, 3 for 1/4, 5 for 1/6 
    end process;
    
-      -- Main process
+      -- Main process, input analysis
    process(ckCs)
    begin
       if rising_edge(ckCs) then
@@ -111,9 +121,14 @@ begin
          case StVar is
             when wait_st => -- Waiting for SOF to arrive
             
-               if tx_bit_in(9 downto 0) = SOF_const(9 downto 0) then 
+                  if tx_bit_in(9 downto 0) = ext("0",10) then
+                  SOF_error(0 downto 0) <= SOF_error(0 downto 0);
+                  StVar <= StVar;
+               elsif tx_bit_in(9 downto 0) = SOF_const(9 downto 0) then
+                  SOF_error(0 downto 0) <= SOF_error(0 downto 0);               
                   StVar <= sof_st;
                else
+                  SOF_error(0 downto 0) <= "1";
                   StVar <= StVar;
                end if;
                
@@ -180,12 +195,41 @@ begin
 
    end process;
    
+   --------------------------------------- Output data generation ------------------------------------------------
+   process(ckCs) begin
+      if rising_edge(ckCs) then
+      if ckCe = '1' then
+      
+         lfsr_ou(9 downto 0) <= lfsr_ou(8 downto 0) & (lfsr_ou(9 downto 9) xor lfsr_ou(6 downto 6));
+         
+         -- Sets the number of information bits in a packet
+         case modulation_mode(2 downto 0) is -- Change to any CE
+            when "000"  => tx_bit_stuf_tdata(9 downto 0) <= ("000000" & lfsr_ou(3 downto 0)); -- QAM16
+            when "001"  => tx_bit_stuf_tdata(9 downto 0) <= ("00000"  & lfsr_ou(4 downto 0)); -- QAM32
+            when "010"  => tx_bit_stuf_tdata(9 downto 0) <= ("0000"   & lfsr_ou(5 downto 0)); -- QAM64
+            when "011"  => tx_bit_stuf_tdata(9 downto 0) <= ("000"    & lfsr_ou(6 downto 0)); -- QAM128
+            when "100"  => tx_bit_stuf_tdata(9 downto 0) <= ("00"     & lfsr_ou(7 downto 0)); -- QAM256
+            when others => tx_bit_stuf_tdata(9 downto 0) <= ("0"      & lfsr_ou(8 downto 0)); -- QAM512
+         end case;
+         
+         -- Output control
+         case mode_ou(0 downto 0) is
+            when "0"    => tx_bit_ou(9 downto 0) <= ("1" & ext("0", 9)); -- 0s
+            when others => tx_bit_ou(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0); -- PRBS
+         end case;
+         
+      end if;
+      end if;
+   end process;
+   ---------------------------------------------------------------------------------------------------------------  
+  
    DataInput_process: process 
    begin
    
       wait for (Cs_Ck_Period*10);
       
       tx_bit_in(9 downto 0) <= (others=>'0');
+      tx_bit_in(9 downto 0) <= (others=>'1');
       wait for (Cs_Ck_Period*10);
       
       -- SOF
@@ -195,13 +239,13 @@ begin
       wait for Cs_Ck_Period;
       
       -- Random data
-      tx_bit_in(9 downto 0) <= "0000111000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0010110010";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0001100100";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "1111001000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
 
       -- Incoming constants
@@ -216,13 +260,13 @@ begin
       wait for Cs_Ck_Period;
       
       -- Random data
-      tx_bit_in(9 downto 0) <= "0000111000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0010110010";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0001100100";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "1111001000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
       
       -- Incoming constants
@@ -237,13 +281,13 @@ begin
       wait for Cs_Ck_Period;
       
       -- Random data
-      tx_bit_in(9 downto 0) <= "0000111000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0010110010";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0001100100";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "1111001000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
 
       -- Incoming constants, not duplicated, error should be 1
@@ -253,13 +297,13 @@ begin
       wait for Cs_Ck_Period;
 
       -- Random data
-      tx_bit_in(9 downto 0) <= "0000111000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0010110010";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "0001100100";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
-      tx_bit_in(9 downto 0) <= "1111001000";
+      tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
       wait for Cs_Ck_Period;
 
       -- EOF
@@ -269,7 +313,31 @@ begin
       wait for Cs_Ck_Period;  
       tx_bit_in(9 downto 0) <= (others=>'0');
       wait for (Cs_Ck_Period*10);
+      
       wait;
       
    end process;
+   
+   
+   DataOutput_process: process 
+   begin
+   
+      wait for (Cs_Ck_Period*10);
+      
+      -- Waiting
+      mode_ou <= "0";
+      wait for (Cs_Ck_Period*10);
+      
+      -- SOF
+      mode_ou <= "1";
+      wait for (Cs_Ck_Period*100);
+      
+      -- Waiting
+      mode_ou <= "0";
+      wait for (Cs_Ck_Period*10);
+      
+      wait;
+      
+   end process;
+   
 end Behavioral;
