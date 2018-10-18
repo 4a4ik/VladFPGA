@@ -24,7 +24,7 @@ architecture Behavioral of bit_stuf_tb is
    -- Clock signals
    signal ckCs : std_logic := '1'; -- Main System Clock
    signal ckCe : std_logic := '1'; -- Main System Clock Enable
-   signal ckPs : std_logic := '0'; -- Pulse
+   signal Data_pulse : std_logic := '0'; -- Pulse
    
    -- LFSR
    signal lfsr_ou : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
@@ -76,26 +76,31 @@ architecture Behavioral of bit_stuf_tb is
    signal rx_bit_stuf_tdata : std_logic_vector(9 downto 0) := (others=>'0'); -- Output data
    signal arst_n : std_logic := '1';
    signal rx_bit_stuf_tvalid : std_logic := '1';
+   signal rx_bit_stuf_send : std_logic := '0';
+   signal rx_bit_stuf_send_Rg1 : std_logic := '0';
+   signal rx_bit_stuf_send_Rg2 : std_logic := '0';
+   signal rx_bit_stuf_send_Rg3 : std_logic := '0';
 
-   signal tx_send_delayed : std_logic_vector(2 downto 0) := (others=>'0'); -- delayed ex_bit_stuf_tvalid, 3 cycles
+   signal rx_send_delayed : std_logic_vector(2 downto 0) := (others=>'0'); -- delayed ex_bit_stuf_tvalid, 3 cycles
    signal tx_bit_stuf_tvalid : std_logic := '1';
    
+   signal tb_out: std_logic_vector(9 downto 0):=(others=>'0');
    ----------- State Machine Hardware ------------
    type FSMstates is (wait_st, sof_st, transf_st, stuff_st); -- FSM
    signal StVar : FSMstates := wait_st;
    
 begin
 
-   --tx_bit_stuf_send <= ckPs;
+   --tx_bit_stuf_send <= Data_pulse;
    -- Clock generation
    ckCs <= not ckCs after Cs_Ck_Period/2;
    
       -- Main system clock signal generation
    Ps_Ck_process : process  
    begin
-      ckPs <= '1';
+      Data_pulse <= '1';
       wait for (Cs_Ck_Period);
-      ckPs <= '0';
+      Data_pulse <= '0';
       wait for (1)*(Cs_Ck_Period); -- Duty cycle, 3 for 1/4, 5 for 1/6 
    end process;
    
@@ -103,10 +108,10 @@ begin
    process(ckCs)
    begin
       if rising_edge(ckCs) then
-
-         tx_send_delayed(2 downto 0) <= tx_send_delayed(1 downto 0) & tx_bit_stuf_send; -- Used for delaying rx_send_delayed by 3 clock cycles
+      if tx_bit_stuf_tvalid = '1' then
+         rx_send_delayed(2 downto 0) <= rx_send_delayed(1 downto 0) & rx_bit_stuf_send; -- Used for delaying rx_send_delayed by 3 clock cycles
      -- if tx_send_delayed(2 downto 2) = "1" then
-      if ckCe = '1' then
+
       
          case modulation_mode(2 downto 0) is 
             when "000"  => Data_const_1(9 downto 0) <= "0000000111"; -- QAM16
@@ -156,10 +161,11 @@ begin
                
                -- <1000......><Data><1000......> - Compares data
                -- <SOF1><SOF2><Data><SOF1><SOF2>
-               if tx_bit_stuf_send = '1' then -- Data are being sent
+               if tx_bit_stuf_tvalid = '1' then -- Data are being sent
                   lfsr_ou_check(9 downto 0) <= lfsr_ou_check(8 downto 0) & (lfsr_ou_check(9 downto 9) xor lfsr_ou_check(6 downto 6)); -- Symbol generation for input analysis
                   if (tx_bit_in_Rg2(9 downto 0) & tx_bit_in_Rg1(9 downto 0)) = (SOF1 & SOF2) then -- Checking if data is right
-                     if tx_bit_in(9 downto 0) =  lfsr_ou_check(9 downto 0) then
+                    -- if tx_bit_in(9 downto 0) =  lfsr_ou_check(9 downto 0) then
+                     if tx_bit_in(9 downto 0) =  "0000000011" then
                     -- if tx_bit_in(9 downto 0) =  tb_current_data(9 downto 0) then
                     -- if tx_bit_in(9 downto 0) =  tb_data_ou_Rg3(9 downto 0) then
                         data_error(0 downto 0) <= "0";
@@ -213,6 +219,9 @@ begin
       tx_bit_in_Conc(19 downto 0) <= tx_bit_in_Rg1(9 downto 0) &  tx_bit_in(9 downto 0); -- SOF&EOF combination
       tx_bit_in_Conc_Rg1(19 downto 0) <= tx_bit_in_Conc(19 downto 0);
       tx_bit_in_Conc_Rg2(19 downto 0) <= tx_bit_in_Conc_Rg1(19 downto 0);
+      rx_bit_stuf_send_Rg1 <= rx_bit_stuf_send;
+      rx_bit_stuf_send_Rg2 <= rx_bit_stuf_send_Rg1;
+      rx_bit_stuf_send_Rg3 <= rx_bit_stuf_send_Rg2;
       
       end if;   
       end if;
@@ -223,209 +232,78 @@ begin
    process(ckCs) begin
       if rising_edge(ckCs) then
     --  if ckCe = '1' then
-      if tx_bit_stuf_send = '1' then
-      
-         if tb_tvalid(0 downto 0) = "1" then -- Enable output symbold generation
+         if rx_send_delayed(2 downto 2) = "1" then
+         if Data_pulse = '0' then
             lfsr_ou(9 downto 0) <= lfsr_ou(8 downto 0) & (lfsr_ou(9 downto 9) xor lfsr_ou(6 downto 6)); -- Output symbol generation
-            tb_current_data(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-         end if;
+         --   tb_current_data(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
+            
+            -- Sets the number of information bits in a packet
+            case modulation_mode(2 downto 0) is -- Change to any CE
+               when "000"  => tx_bit_stuf_tdata(9 downto 0) <= ("000000" & lfsr_ou(3 downto 0)); -- QAM16
+               when "001"  => tx_bit_stuf_tdata(9 downto 0) <= ("00000"  & lfsr_ou(4 downto 0)); -- QAM32
+               when "010"  => tx_bit_stuf_tdata(9 downto 0) <= ("0000"   & lfsr_ou(5 downto 0)); -- QAM64
+               when "011"  => tx_bit_stuf_tdata(9 downto 0) <= ("000"    & lfsr_ou(6 downto 0)); -- QAM128
+               when "100"  => tx_bit_stuf_tdata(9 downto 0) <= ("00"     & lfsr_ou(7 downto 0)); -- QAM256
+               when others => tx_bit_stuf_tdata(9 downto 0) <= ("0"      & lfsr_ou(8 downto 0)); -- QAM512
+            end case;
+            
+            -- Output control
+            case mode_ou(0 downto 0) is -- change to tb_tvalid(0 downto 0)!!
+               when "0"    => tx_bit_ou(9 downto 0) <= ("1" & ext("0", 9)); -- 0s
+               when others => tx_bit_ou(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0); -- PRBS
+            end case;
          
-         -- Sets the number of information bits in a packet
-         case modulation_mode(2 downto 0) is -- Change to any CE
-            when "000"  => tx_bit_stuf_tdata(9 downto 0) <= ("000000" & lfsr_ou(3 downto 0)); -- QAM16
-            when "001"  => tx_bit_stuf_tdata(9 downto 0) <= ("00000"  & lfsr_ou(4 downto 0)); -- QAM32
-            when "010"  => tx_bit_stuf_tdata(9 downto 0) <= ("0000"   & lfsr_ou(5 downto 0)); -- QAM64
-            when "011"  => tx_bit_stuf_tdata(9 downto 0) <= ("000"    & lfsr_ou(6 downto 0)); -- QAM128
-            when "100"  => tx_bit_stuf_tdata(9 downto 0) <= ("00"     & lfsr_ou(7 downto 0)); -- QAM256
-            when others => tx_bit_stuf_tdata(9 downto 0) <= ("0"      & lfsr_ou(8 downto 0)); -- QAM512
-         end case;
+         -- Output data registering
+         tb_data_ou(9 downto 0) <= tx_bit_ou(9 downto 0);
+         tb_data_ou_Rg1(9 downto 0) <= tb_data_ou(9 downto 0);
+         tb_data_ou_Rg2(9 downto 0) <= tb_data_ou_Rg1(9 downto 0);
+         tb_data_ou_Rg3(9 downto 0) <= tb_data_ou_Rg2(9 downto 0);
          
-         -- Output control
-         case mode_ou(0 downto 0) is -- change to tb_tvalid(0 downto 0)!!
-            when "0"    => tx_bit_ou(9 downto 0) <= ("1" & ext("0", 9)); -- 0s
-                           tb_tvalid(0 downto 0) <= "0"; 
-            when others => tx_bit_ou(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0); -- PRBS
-                           tb_tvalid(0 downto 0) <= "1";
-         end case;
-      
-      -- Output data registering
-      tb_data_ou(9 downto 0) <= tx_bit_ou(9 downto 0);
-      tb_data_ou_Rg1(9 downto 0) <= tb_data_ou(9 downto 0);
-      tb_data_ou_Rg2(9 downto 0) <= tb_data_ou_Rg1(9 downto 0);
-      tb_data_ou_Rg3(9 downto 0) <= tb_data_ou_Rg2(9 downto 0);
-      
-      tx_tb_data(9 downto 0) <= tx_bit_ou(9 downto 0); -- Test 1 output signal
+         tx_tb_data(9 downto 0) <= tx_bit_ou(9 downto 0); -- Test 1 output signal
       
       end if;
       end if;
-      
+      end if;
    end process;
    ---------------------------------------------------------------------------------------------------------------  
   
-   -- DataInput_process: process 
-   -- begin
-      
-      -- wait for (Cs_Ck_Period*10);
-      
-      -- tx_bit_in(9 downto 0) <= (others=>'0');
-      -- tx_bit_in(9 downto 0) <= (others=>'1');
-      -- wait for (Cs_Ck_Period*10);
-      
-      -- -- SOF
-      -- tx_bit_in(9 downto 0) <= SOF1(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= SOF2(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      
-      -- -- Random data
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
+   DataOutput_process: process 
+   begin
 
-      -- -- Incoming constants
-      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- -- Duplicated, error should be 0
-      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      -- wait for Cs_Ck_Period;
+      wait for (Cs_Ck_Period);
       
-      -- -- Random data
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      
-      -- -- Incoming constants
-      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- -- Duplicated, error should be 0
-      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      
-      -- -- Random data
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-
-      -- -- Incoming constants, not duplicated, error should be 1
-      -- tx_bit_in(9 downto 0) <= Data_const_1(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= Data_const_2(9 downto 0);
-      -- wait for Cs_Ck_Period;
-
-      -- -- Random data
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-      -- tx_bit_in(9 downto 0) <= tx_bit_stuf_tdata(9 downto 0);
-      -- wait for Cs_Ck_Period;
-
-      -- -- EOF
-      -- tx_bit_in(9 downto 0) <= SOF1(9 downto 0);
-      -- wait for Cs_Ck_Period; 
-      -- tx_bit_in(9 downto 0) <= SOF2(9 downto 0);
-      -- wait for Cs_Ck_Period;  
-      -- tx_bit_in(9 downto 0) <= (others=>'0');
-      -- wait for (Cs_Ck_Period*10);
-      
-      -- wait;
-      
-   -- end process;
+      wait until rx_bit_stuf_send_Rg3 = '1';
+      tb_out <= "1000000000";
+      wait for (Cs_Ck_Period);
+      tb_out <= "0000000011";
+      wait for (Cs_Ck_Period);
+      tb_out <= "1000000000";     
+      wait;
+   end process;
    
    -- DataOutput_process: process 
    -- begin
-      -- -- Test 1
-      -- wait for (Cs_Ck_Period*10);
-      
-      -- -- Waiting
-      -- mode_ou <= "0";
-      -- wait for (Cs_Ck_Period*9);
-      
-      -- -- SOF
-      -- mode_ou <= "1";
-      -- wait for (Cs_Ck_Period*1);  -- tvalid should have 1 period here
-      
-      -- -- Waiting
-      -- mode_ou <= "0";
-      -- wait for (Cs_Ck_Period*10);
-      
-      -- -- Test 2
-      -- wait for (Cs_Ck_Period*10);
-      
-      -- -- Waiting
-      -- mode_ou <= "0";
-      -- wait for (Cs_Ck_Period*9);
-      
-      -- -- SOF
-      -- mode_ou <= "1";
-      -- wait for (Cs_Ck_Period*2); -- tvalid should have 2 periods here
-      -- --tvalid <= "1";
-      -- --tvalid <= "0"; 
-      -- --tvalid <= "1";
-      -- --tvalid <= "0"; -- Like that
-      
-      -- -- Waiting
-      -- mode_ou <= "0";
-      -- wait for (Cs_Ck_Period*10);      
+     
 
-      -- -- Test 3
-      -- wait for (Cs_Ck_Period*10);
       
-      -- -- Waiting
-      -- mode_ou <= "0";
-      -- wait for (Cs_Ck_Period*9);
-      
-      -- -- SOF
-      -- mode_ou <= "1";
-      -- wait for (Cs_Ck_Period*3); -- tvalid should have 3 periods here
-      
-      -- -- Waiting
-      -- mode_ou <= "0";
-      -- wait for (Cs_Ck_Period*10);          
-      
-      -- wait;
-      
-      
---   end process;
+   -- end process;
    
+
    symbol_stuffer_wrk: entity work.symbol_stuffer   
    port map (
              -- Rx
              ckMain => ckCs,
              arst_n => arst_n,                                   -- asynchronous reset
              modulation_mode => modulation_mode,                 -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
-             send_data => ckPs,    
+             send_data => Data_pulse,    
              
-             rx_bit_stuf_send => tx_bit_stuf_send,               -- => send data pulse, according to current bandwidth
+             rx_bit_stuf_send => rx_bit_stuf_send,               -- => send data pulse, according to current bandwidth
              rx_bit_stuf_tvalid  => tx_send_delayed(2),          -- tvalid from framer
-             rx_bit_stuf_tdata => tx_bit_ou,                     -- data from framer    
+             rx_bit_stuf_tdata => tb_out,                     -- data from framer    
+            -- rx_bit_stuf_tdata => tx_bit_ou,                     -- data from framer    
              -- Tx
              tx_bit_stuf_tvalid => tx_bit_stuf_tvalid,           -- tvalid to modem
              tx_bit_stuf_tdata =>  tx_bit_in(9 downto 0));       -- data to modem
 
+ 
 end Behavioral;
