@@ -238,10 +238,10 @@ begin
    process(ckCs) begin
       if rising_edge(ckCs) then
       if lfsr_ou_En(0 downto 0) = "1" then
-         lfsr_ou_test(9 downto 0) <= lfsr_ou_check(8 downto 0) & (lfsr_ou_check(9 downto 9) xor lfsr_ou_check(6 downto 6)); -- Output symbol generation
+         lfsr_ou_test(9 downto 0) <= lfsr_ou_test(8 downto 0) & (lfsr_ou_test(9 downto 9) xor lfsr_ou_test(6 downto 6)); -- Output symbol generation
       end if;
       if lfsr_in_En(0 downto 0) = "1" then
-         lfsr_in_test(9 downto 0) <= lfsr_in_check(8 downto 0) & (lfsr_in_check(9 downto 9) xor lfsr_in_check(6 downto 6)); -- Output symbol generation
+         lfsr_in_test(9 downto 0) <= lfsr_in_test(8 downto 0) & (lfsr_in_test(9 downto 9) xor lfsr_in_test(6 downto 6)); -- Output symbol generation
       end if;
       end if;
    end process;
@@ -290,7 +290,7 @@ begin
       
       tb_out <= "1000000000";
       wait for 1*(Cs_Ck_Period);
-  --    rx_bit_stuf_send <= '1';
+     -- rx_bit_stuf_send <= '1';
       -- Test 1
       --rx_bit_stuf_send <= '1';
       wait until rx_bit_stuf_send_Rg3 = '1';
@@ -302,7 +302,6 @@ begin
       lfsr_ou_En <= "0";
       tb_out <= "1000000000";     
       wait for 12*(Cs_Ck_Period);
-      
       -- -- Test 2
       -- tb_out <= "0000000011";     
       -- wait for (Cs_Ck_Period);
