@@ -28,7 +28,10 @@ architecture Behavioral of bit_stuf_tb is
    
    -- LFSR
    signal lfsr_ou : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
+   signal lfsr_in_check : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
    signal lfsr_ou_check : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
+   signal lfsr_in_test : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
+   signal lfsr_ou_test : std_logic_vector(9 downto 0) := (others=>'1'); -- Length 49 LFSR (49) (40)
    
    -- Control signals
    signal modulation_mode : std_logic_vector(2 downto 0) := "000"; -- Modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
@@ -43,7 +46,10 @@ architecture Behavioral of bit_stuf_tb is
    signal SOF_error : std_logic_vector(0 downto 0):="0"; -- Error at SOF
    signal mode_ou : std_logic_vector(0 downto 0):="0"; -- Controls output values
    signal data_error: std_logic_vector(0 downto 0):="0";
-   
+   signal lfsr_En : std_logic_vector(0 downto 0):="0";
+   signal lfsr_in_En : std_logic_vector(0 downto 0):="0";
+   signal lfsr_ou_En : std_logic_vector(0 downto 0):="0";
+  
    -- TB data
    signal tb_current_data : std_logic_vector(9 downto 0):=(others=>'0'); -- Saving current data value
    signal current_data : std_logic_vector(9 downto 0):=(others=>'0');   -- Saving current data value -- old one, remove!!
@@ -165,7 +171,7 @@ begin
                   lfsr_ou_check(9 downto 0) <= lfsr_ou_check(8 downto 0) & (lfsr_ou_check(9 downto 9) xor lfsr_ou_check(6 downto 6)); -- Symbol generation for input analysis
                   if (tx_bit_in_Rg2(9 downto 0) & tx_bit_in_Rg1(9 downto 0)) = (SOF1 & SOF2) then -- Checking if data is right
                     -- if tx_bit_in(9 downto 0) =  lfsr_ou_check(9 downto 0) then
-                     if tx_bit_in(9 downto 0) =  "0000000011" then
+                     if tx_bit_in(3 downto 0) =  lfsr_in_check(3 downto 0) then
                     -- if tx_bit_in(9 downto 0) =  tb_current_data(9 downto 0) then
                     -- if tx_bit_in(9 downto 0) =  tb_data_ou_Rg3(9 downto 0) then
                         data_error(0 downto 0) <= "0";
@@ -228,6 +234,18 @@ begin
 
    end process;
    
+   -- Symbol generation
+   process(ckCs) begin
+      if rising_edge(ckCs) then
+      if lfsr_ou_En(0 downto 0) = "1" then
+         lfsr_ou_test(9 downto 0) <= lfsr_ou_check(8 downto 0) & (lfsr_ou_check(9 downto 9) xor lfsr_ou_check(6 downto 6)); -- Output symbol generation
+      end if;
+      if lfsr_in_En(0 downto 0) = "1" then
+         lfsr_in_test(9 downto 0) <= lfsr_in_check(8 downto 0) & (lfsr_in_check(9 downto 9) xor lfsr_in_check(6 downto 6)); -- Output symbol generation
+      end if;
+      end if;
+   end process;
+   
    --------------------------------------- Output data generation ------------------------------------------------
    process(ckCs) begin
       if rising_edge(ckCs) then
@@ -272,14 +290,16 @@ begin
       
       tb_out <= "1000000000";
       wait for 1*(Cs_Ck_Period);
-      
+  --    rx_bit_stuf_send <= '1';
       -- Test 1
       --rx_bit_stuf_send <= '1';
       wait until rx_bit_stuf_send_Rg3 = '1';
       tb_out <= "1000000000";
+      lfsr_ou_En <= "1";
       wait for 2*(Cs_Ck_Period);
-      tb_out <= "0000000011";
+      tb_out <= ("000000" & lfsr_ou_test(3 downto 0));
       wait for (Cs_Ck_Period);
+      lfsr_ou_En <= "0";
       tb_out <= "1000000000";     
       wait for 12*(Cs_Ck_Period);
       
