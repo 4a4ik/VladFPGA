@@ -302,7 +302,10 @@ begin
       
    end process;
    
-   -- DataOutput_process: process 
+   -- DataInput_process: process 
+   
+      
+   
    -- begin
      
 
@@ -310,21 +313,21 @@ begin
    -- end process;
    
 
-   -- symbol_stuffer_wrk: entity work.symbol_stuffer   
-   -- port map (
-             -- -- Rx
-             -- ckMain => ckCs,
-             -- arst_n => arst_n,                                   -- asynchronous reset
-             -- modulation_mode => modulation_mode,                 -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
-             -- send_data => Data_pulse,    
+   symbol_stuffer_wrk: entity work.symbol_stuffer   
+   port map (
+             -- Rx
+             ckMain => ckCs,
+             arst_n => arst_n,                                   -- asynchronous reset
+             modulation_mode => modulation_mode,                 -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
+             send_data => Data_pulse,    
              
-             -- rx_bit_stuf_send => rx_bit_stuf_send,               -- => send data pulse, according to current bandwidth
-             -- rx_bit_stuf_tvalid  => tx_send_delayed(2),          -- tvalid from framer
-             -- rx_bit_stuf_tdata => tb_out,                     -- data from framer    
-            -- -- rx_bit_stuf_tdata => tx_bit_ou,                     -- data from framer    
-             -- -- Tx
-             -- tx_bit_stuf_tvalid => tx_bit_stuf_tvalid,           -- tvalid to modem
-             -- tx_bit_stuf_tdata =>  tx_bit_in(9 downto 0));       -- data to modem
+             rx_bit_stuf_send => rx_bit_stuf_send,               -- => send data pulse, according to current bandwidth
+             rx_bit_stuf_tvalid  => tx_send_delayed(2),          -- tvalid from framer
+             rx_bit_stuf_tdata => tb_out,                     -- data from framer    
+            -- rx_bit_stuf_tdata => tx_bit_ou,                     -- data from framer    
+             -- Tx
+             tx_bit_stuf_tvalid => tx_bit_stuf_tvalid,           -- tvalid to modem
+             tx_bit_stuf_tdata =>  tx_bit_in(9 downto 0));       -- data to modem
 
  
 end Behavioral;
