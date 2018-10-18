@@ -270,15 +270,36 @@ begin
    DataOutput_process: process 
    begin
 
-      wait for (Cs_Ck_Period);
+      wait for 10*(Cs_Ck_Period);
       
+      -- Test 1
+      rx_bit_stuf_send <= '1';
       wait until rx_bit_stuf_send_Rg3 = '1';
       tb_out <= "1000000000";
       wait for (Cs_Ck_Period);
       tb_out <= "0000000011";
       wait for (Cs_Ck_Period);
       tb_out <= "1000000000";     
-      wait;
+      wait for 12*(Cs_Ck_Period);
+      
+      -- -- Test 2
+      -- tb_out <= "0000000011";     
+      -- wait for (Cs_Ck_Period);
+      -- tb_out <= "0000001100";
+      -- wait for (Cs_Ck_Period);
+      -- tb_out <= "1000000000"; 
+      -- wait for 12*(Cs_Ck_Period); 
+      
+      -- -- Test 3
+      -- tb_out <= "0000000011";     
+      -- wait for (Cs_Ck_Period);
+      -- tb_out <= "0000001100";
+      -- wait for (Cs_Ck_Period);
+      -- tb_out <= "0000110000";
+      -- wait for (Cs_Ck_Period);
+      -- tb_out <= "1000000000";        
+      -- wait for 12*(Cs_Ck_Period);  
+      
    end process;
    
    -- DataOutput_process: process 
@@ -289,21 +310,21 @@ begin
    -- end process;
    
 
-   symbol_stuffer_wrk: entity work.symbol_stuffer   
-   port map (
-             -- Rx
-             ckMain => ckCs,
-             arst_n => arst_n,                                   -- asynchronous reset
-             modulation_mode => modulation_mode,                 -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
-             send_data => Data_pulse,    
+   -- symbol_stuffer_wrk: entity work.symbol_stuffer   
+   -- port map (
+             -- -- Rx
+             -- ckMain => ckCs,
+             -- arst_n => arst_n,                                   -- asynchronous reset
+             -- modulation_mode => modulation_mode,                 -- modulation mode, QAM16="000", QAM32="001", QAM64="010", QAM128="011", QAM256="100", QAM512="101"
+             -- send_data => Data_pulse,    
              
-             rx_bit_stuf_send => rx_bit_stuf_send,               -- => send data pulse, according to current bandwidth
-             rx_bit_stuf_tvalid  => tx_send_delayed(2),          -- tvalid from framer
-             rx_bit_stuf_tdata => tb_out,                     -- data from framer    
-            -- rx_bit_stuf_tdata => tx_bit_ou,                     -- data from framer    
-             -- Tx
-             tx_bit_stuf_tvalid => tx_bit_stuf_tvalid,           -- tvalid to modem
-             tx_bit_stuf_tdata =>  tx_bit_in(9 downto 0));       -- data to modem
+             -- rx_bit_stuf_send => rx_bit_stuf_send,               -- => send data pulse, according to current bandwidth
+             -- rx_bit_stuf_tvalid  => tx_send_delayed(2),          -- tvalid from framer
+             -- rx_bit_stuf_tdata => tb_out,                     -- data from framer    
+            -- -- rx_bit_stuf_tdata => tx_bit_ou,                     -- data from framer    
+             -- -- Tx
+             -- tx_bit_stuf_tvalid => tx_bit_stuf_tvalid,           -- tvalid to modem
+             -- tx_bit_stuf_tdata =>  tx_bit_in(9 downto 0));       -- data to modem
 
  
 end Behavioral;
