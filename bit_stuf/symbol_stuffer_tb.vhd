@@ -108,7 +108,7 @@ begin
    process(ckCs)
    begin
       if rising_edge(ckCs) then
-      if tx_bit_stuf_tvalid = '1' then
+      --if tx_bit_stuf_tvalid = '1' then
          rx_send_delayed(2 downto 0) <= rx_send_delayed(1 downto 0) & rx_bit_stuf_send; -- Used for delaying rx_send_delayed by 3 clock cycles
      -- if tx_send_delayed(2 downto 2) = "1" then
 
@@ -224,7 +224,7 @@ begin
       rx_bit_stuf_send_Rg3 <= rx_bit_stuf_send_Rg2;
       
       end if;   
-      end if;
+      --end if;
 
    end process;
    
@@ -269,14 +269,15 @@ begin
   
    DataOutput_process: process 
    begin
-
-      wait for 10*(Cs_Ck_Period);
+      
+      tb_out <= "1000000000";
+      wait for 1*(Cs_Ck_Period);
       
       -- Test 1
-      rx_bit_stuf_send <= '1';
+      --rx_bit_stuf_send <= '1';
       wait until rx_bit_stuf_send_Rg3 = '1';
       tb_out <= "1000000000";
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "0000000011";
       wait for (Cs_Ck_Period);
       tb_out <= "1000000000";     
@@ -322,7 +323,7 @@ begin
              send_data => Data_pulse,    
              
              rx_bit_stuf_send => rx_bit_stuf_send,               -- => send data pulse, according to current bandwidth
-             rx_bit_stuf_tvalid  => tx_send_delayed(2),          -- tvalid from framer
+             rx_bit_stuf_tvalid  => rx_send_delayed(2),          -- tvalid from framer
              rx_bit_stuf_tdata => tb_out,                     -- data from framer    
             -- rx_bit_stuf_tdata => tx_bit_ou,                     -- data from framer    
              -- Tx
