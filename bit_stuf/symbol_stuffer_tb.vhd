@@ -16,8 +16,8 @@ architecture Behavioral of bit_stuf_tb is
    constant Cs_Ck_Period : time:= 4 ns; -- Main clock period
 
    -- Start of file, end of file constants
-   signal SOF1 : std_logic_vector(9 downto 0) := "0000000111";
-   signal SOF2 : std_logic_vector(9 downto 0) := "0000000111";
+   signal SOF1 : std_logic_vector(9 downto 0) := "0000001111";
+   signal SOF2 : std_logic_vector(9 downto 0) := "0000001111";
    signal Data_const_1 : std_logic_vector(9 downto 0) := "0000000111";
    signal Data_const_2 : std_logic_vector(9 downto 0) := "0000001110";
    
@@ -290,16 +290,18 @@ begin
       
       tb_out <= "1000000000";
       wait for 1*(Cs_Ck_Period);
-     -- rx_bit_stuf_send <= '1';
+   --   rx_bit_stuf_send <= '1'; -- Uncomment for simulating tb without module
       -- Test 1
       --rx_bit_stuf_send <= '1';
       wait until rx_bit_stuf_send_Rg3 = '1';
       tb_out <= "1000000000";
       lfsr_ou_En <= "1";
-      wait for 2*(Cs_Ck_Period);
+      wait for 1*(Cs_Ck_Period);
+      lfsr_ou_En <= "0";
+      wait for 1*(Cs_Ck_Period);
       tb_out <= ("000000" & lfsr_ou_test(3 downto 0));
       wait for (Cs_Ck_Period);
-      lfsr_ou_En <= "0";
+
       tb_out <= "1000000000";     
       wait for 12*(Cs_Ck_Period);
       -- -- Test 2
@@ -333,7 +335,7 @@ begin
    -- end process;
    
 
-   symbol_stuffer_wrk: entity work.symbol_stuffer   
+  symbol_stuffer_wrk: entity work.symbol_stuffer   
    port map (
              -- Rx
              ckMain => ckCs,
