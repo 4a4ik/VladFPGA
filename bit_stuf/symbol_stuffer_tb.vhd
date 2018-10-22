@@ -259,8 +259,8 @@ begin
    -- Symbol generation
    process(ckCs) begin
       if rising_edge(ckCs) then
-      tx_bit_stuf_tvalid <= tb_send_data;
-      tx_bit_stuf_tvalidRg <= tx_bit_stuf_tvalid;
+    --  tx_bit_stuf_tvalid <= tb_send_data;
+    --  tx_bit_stuf_tvalidRg <= tx_bit_stuf_tvalid;
       if lfsr_ou_En(0 downto 0) = "1" then
          lfsr_ou_test(9 downto 0) <= lfsr_ou_test(8 downto 0) & (lfsr_ou_test(9 downto 9) xor lfsr_ou_test(6 downto 6)); -- Output symbol generation
       end if;
