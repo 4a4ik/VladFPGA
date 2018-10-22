@@ -89,6 +89,7 @@ architecture Behavioral of bit_stuf_tb is
 
    signal rx_send_delayed : std_logic_vector(2 downto 0) := (others=>'0'); -- delayed ex_bit_stuf_tvalid, 3 cycles
    signal tx_bit_stuf_tvalid : std_logic := '1';
+   signal tx_bit_stuf_tvalid_Rg1 : std_logic := '0';
    
    signal tb_out: std_logic_vector(9 downto 0):=(others=>'0');
    ----------- State Machine Hardware ------------
@@ -114,6 +115,7 @@ begin
    process(ckCs)
    begin
       if rising_edge(ckCs) then
+      tx_bit_stuf_tvalid_Rg1 <= tx_bit_stuf_tvalid; 
       --if tx_bit_stuf_tvalid = '1' then
          rx_send_delayed(2 downto 0) <= rx_send_delayed(1 downto 0) & rx_bit_stuf_send; -- Used for delaying rx_send_delayed by 3 clock cycles
      -- if tx_send_delayed(2 downto 2) = "1" then
@@ -135,6 +137,7 @@ begin
          end case;
          
          --------------------------------------------- FSM ------------------------------------------------------
+         if tx_bit_stuf_tvalid_Rg1 = '1' then
          case StVar is
             when wait_st => -- Waiting for SOF to arrive
             
@@ -187,6 +190,7 @@ begin
                StVar <= wait_st;
                
          end case;
+         end if;
          --------------------------------------------------------------------------------------------------------
 
       transf_err(0 downto 0) <= flag_cnt(0 downto 0) and transf_flag_Rg2(0 downto 0);
@@ -295,32 +299,46 @@ begin
       --rx_bit_stuf_send <= '1';
       wait until rx_bit_stuf_send_Rg3 = '1';
       tb_out <= "1000000000";
-      lfsr_ou_En <= "1";
+   --   lfsr_ou_En <= "1";
+   --   wait for 1*(Cs_Ck_Period);
+  --    lfsr_ou_En <= "0";
       wait for 1*(Cs_Ck_Period);
-      lfsr_ou_En <= "0";
-      wait for 1*(Cs_Ck_Period);
-      tb_out <= ("000000" & lfsr_ou_test(3 downto 0));
+      tb_out <= "0000000001";
       wait for (Cs_Ck_Period);
 
       tb_out <= "1000000000";     
       wait for 12*(Cs_Ck_Period);
-      -- -- Test 2
-      -- tb_out <= "0000000011";     
-      -- wait for (Cs_Ck_Period);
-      -- tb_out <= "0000001100";
-      -- wait for (Cs_Ck_Period);
-      -- tb_out <= "1000000000"; 
-      -- wait for 12*(Cs_Ck_Period); 
       
-      -- -- Test 3
-      -- tb_out <= "0000000011";     
-      -- wait for (Cs_Ck_Period);
-      -- tb_out <= "0000001100";
-      -- wait for (Cs_Ck_Period);
-      -- tb_out <= "0000110000";
-      -- wait for (Cs_Ck_Period);
-      -- tb_out <= "1000000000";        
-      -- wait for 12*(Cs_Ck_Period);  
+      -- Test 2
+      tb_out <= "0000000001";     
+      wait for (Cs_Ck_Period);
+      tb_out <= "0000000010";
+      wait for (Cs_Ck_Period);
+      tb_out <= "1000000000"; 
+      wait for 12*(Cs_Ck_Period); 
+      
+      -- Test 3
+      tb_out <= "0000000001";     
+      wait for (Cs_Ck_Period);
+      tb_out <= "0000000010";
+      wait for (Cs_Ck_Period);
+      tb_out <= "0000000011";
+      wait for (Cs_Ck_Period);
+      tb_out <= "1000000000"; 
+      wait for 12*(Cs_Ck_Period);  
+      
+      -- Test 4
+      tb_out <= "0000000001";     
+      wait for (Cs_Ck_Period);
+      tb_out <= "0000000010";
+      wait for (Cs_Ck_Period);
+      tb_out <= "0000000011";
+      wait for (Cs_Ck_Period);
+      tb_out <= "0000000100";
+      wait for (Cs_Ck_Period);
+      tb_out <= "1000000000"; 
+      wait for 12*(Cs_Ck_Period);  
+      
       
    end process;
    
