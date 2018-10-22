@@ -78,6 +78,11 @@ architecture Behavioral of bit_stuf_tb is
    -- Test1
    signal tx_tb_data : std_logic_vector(9 downto 0) := ("1" & ext("0", 9));
    
+   -- Eugene's module
+   signal tb_send_data : std_logic:='0';
+   signal eu_stuf_data : std_logic_vector(9 downto 0) := (others=>'0');
+   signal desired_value : std_logic_vector(9 downto 0):=(others=>'0');
+   
    -- UUT
    signal rx_bit_stuf_tdata : std_logic_vector(9 downto 0) := (others=>'0'); -- Output data
    signal arst_n : std_logic := '1';
@@ -88,12 +93,13 @@ architecture Behavioral of bit_stuf_tb is
    signal rx_bit_stuf_send_Rg3 : std_logic := '0';
 
    signal rx_send_delayed : std_logic_vector(2 downto 0) := (others=>'0'); -- delayed ex_bit_stuf_tvalid, 3 cycles
-   signal tx_bit_stuf_tvalid : std_logic := '1';
+   signal tx_bit_stuf_tvalid : std_logic := '0';
+   signal tx_bit_stuf_tvalidRg : std_logic := '0';
    signal tx_bit_stuf_tvalid_Rg1 : std_logic := '0';
    
    signal tb_out: std_logic_vector(9 downto 0):=(others=>'0');
    ----------- State Machine Hardware ------------
-   type FSMstates is (wait_st, sof_st, transf_st, stuff_st); -- FSM
+   type FSMstates is (wait_st, sof_st, transf_st,eof_st, stuff_st); -- FSM
    signal StVar : FSMstates := wait_st;
    
 begin
@@ -115,6 +121,7 @@ begin
    process(ckCs)
    begin
       if rising_edge(ckCs) then
+    --  tx_bit_in <= eu_stuf_data;
       tx_bit_stuf_tvalid_Rg1 <= tx_bit_stuf_tvalid; 
       --if tx_bit_stuf_tvalid = '1' then
          rx_send_delayed(2 downto 0) <= rx_send_delayed(1 downto 0) & rx_bit_stuf_send; -- Used for delaying rx_send_delayed by 3 clock cycles
@@ -162,6 +169,31 @@ begin
                
             when transf_st => -- Data transfer state
                
+               if tx_bit_in(9 downto 0) = SOF1(9 downto 0) then
+                  StVar <= eof_st;
+               else
+                  StVar <= StVar;
+               end if;
+               
+               if tx_bit_stuf_tvalid_Rg1 = '1' then -- Data are being sent
+                  lfsr_ou_check(9 downto 0) <= lfsr_ou_check(8 downto 0) & (lfsr_ou_check(9 downto 9) xor lfsr_ou_check(6 downto 6)); -- Symbol generation for input analysis
+                  if (tx_bit_in_Rg2(9 downto 0) & tx_bit_in_Rg1(9 downto 0)) = (SOF1 & SOF2) then -- Checking if data is right
+                     -- if tx_bit_in(9 downto 0) =  lfsr_ou_check(9 downto 0) then
+                     if tx_bit_in(3 downto 0) =  desired_value(3 downto 0) then
+                      --if tx_bit_in(3 downto 0) =  lfsr_in_check(3 downto 0) then
+                     -- if tx_bit_in(9 downto 0) =  tb_current_data(9 downto 0) then
+                     -- if tx_bit_in(9 downto 0) =  tb_data_ou_Rg3(9 downto 0) then
+                         data_error(0 downto 0) <= "0";
+                     else
+                        data_error(0 downto 0) <= "1";
+                     end if;
+                  else
+                     data_error(0 downto 0) <= data_error(0 downto 0);
+                  end if;
+               end if;   
+              
+            when eof_st => -- Start of frame state
+               
                if tx_bit_in_conc(19 downto 0) = (SOF1(9 downto 0) & SOF2(9 downto 0)) then
                   StVar <= wait_st;
                else
@@ -170,27 +202,13 @@ begin
                
                -- <1000......><Data><1000......> - Compares data
                -- <SOF1><SOF2><Data><SOF1><SOF2>
-               if tx_bit_stuf_tvalid = '1' then -- Data are being sent
-                  lfsr_ou_check(9 downto 0) <= lfsr_ou_check(8 downto 0) & (lfsr_ou_check(9 downto 9) xor lfsr_ou_check(6 downto 6)); -- Symbol generation for input analysis
-                  if (tx_bit_in_Rg2(9 downto 0) & tx_bit_in_Rg1(9 downto 0)) = (SOF1 & SOF2) then -- Checking if data is right
-                    -- if tx_bit_in(9 downto 0) =  lfsr_ou_check(9 downto 0) then
-                     if tx_bit_in(3 downto 0) =  lfsr_in_check(3 downto 0) then
-                    -- if tx_bit_in(9 downto 0) =  tb_current_data(9 downto 0) then
-                    -- if tx_bit_in(9 downto 0) =  tb_data_ou_Rg3(9 downto 0) then
-                        data_error(0 downto 0) <= "0";
-                     else
-                        data_error(0 downto 0) <= "1";
-                     end if;
-                  else
-                     data_error(0 downto 0) <= data_error(0 downto 0);
-                  end if;
-               end if;
+             
             when others =>
             
                StVar <= wait_st;
                
          end case;
-         end if;
+         
          --------------------------------------------------------------------------------------------------------
 
       transf_err(0 downto 0) <= flag_cnt(0 downto 0) and transf_flag_Rg2(0 downto 0);
@@ -235,12 +253,14 @@ begin
       
       end if;   
       --end if;
-
+      end if;
    end process;
    
    -- Symbol generation
    process(ckCs) begin
       if rising_edge(ckCs) then
+      tx_bit_stuf_tvalid <= tb_send_data;
+      tx_bit_stuf_tvalidRg <= tx_bit_stuf_tvalid;
       if lfsr_ou_En(0 downto 0) = "1" then
          lfsr_ou_test(9 downto 0) <= lfsr_ou_test(8 downto 0) & (lfsr_ou_test(9 downto 9) xor lfsr_ou_test(6 downto 6)); -- Output symbol generation
       end if;
@@ -293,67 +313,111 @@ begin
    begin
       
       tb_out <= "1000000000";
-      wait for 1*(Cs_Ck_Period);
-   --   rx_bit_stuf_send <= '1'; -- Uncomment for simulating tb without module
+      wait for 2*(Cs_Ck_Period);
+     -- rx_bit_stuf_send <= '1'; -- Uncomment for simulating tb without module
       -- Test 1
       --rx_bit_stuf_send <= '1';
       wait until rx_bit_stuf_send_Rg3 = '1';
       tb_out <= "1000000000";
-   --   lfsr_ou_En <= "1";
-   --   wait for 1*(Cs_Ck_Period);
-  --    lfsr_ou_En <= "0";
       wait for 1*(Cs_Ck_Period);
       tb_out <= "0000000001";
-      wait for (Cs_Ck_Period);
-
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "1000000000";     
       wait for 12*(Cs_Ck_Period);
       
       -- Test 2
       tb_out <= "0000000001";     
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "0000000010";
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "1000000000"; 
       wait for 12*(Cs_Ck_Period); 
       
       -- Test 3
       tb_out <= "0000000001";     
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "0000000010";
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "0000000011";
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "1000000000"; 
       wait for 12*(Cs_Ck_Period);  
       
       -- Test 4
       tb_out <= "0000000001";     
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "0000000010";
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "0000000011";
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "0000000100";
-      wait for (Cs_Ck_Period);
+      wait for 2*(Cs_Ck_Period);
       tb_out <= "1000000000"; 
       wait for 12*(Cs_Ck_Period);  
       
       
    end process;
    
-   -- DataInput_process: process 
+   DataInput_process: process 
+   begin
+      tb_send_data <= not(tb_send_data);
+      wait for (Cs_Ck_Period);
+   end process;
    
+   DataOutputStuffer_process: process 
+   begin
       
-   
-   -- begin
-     
-
+      -- Test 1
+      wait for 13*(Cs_Ck_Period);
+      eu_stuf_data <= SOF1;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= SOF2;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= "0000000001";
+      wait for 2*(Cs_Ck_Period);     
+      eu_stuf_data <= SOF1;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= SOF2;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= (others=>'0');
+      wait for 12*(Cs_Ck_Period);  
       
-   -- end process;
-   
+      -- Test 2     
+      eu_stuf_data <= SOF1;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= SOF2;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= "0000000001";
+      wait for 2*(Cs_Ck_Period);     
+      eu_stuf_data <= "0000000010";
+      wait for 2*(Cs_Ck_Period);     
+      eu_stuf_data <= SOF1;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= SOF2;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= (others=>'0');
+      wait for 12*(Cs_Ck_Period);   
+      
+      -- Test 3      
+      eu_stuf_data <= SOF1;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= SOF2;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= "0000000001";
+      wait for 2*(Cs_Ck_Period);     
+      eu_stuf_data <= "0000000010";
+      wait for 2*(Cs_Ck_Period);     
+      eu_stuf_data <= "0000000011";
+      wait for 2*(Cs_Ck_Period);     
+      eu_stuf_data <= SOF1;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= SOF2;
+      wait for 2*(Cs_Ck_Period);   
+      eu_stuf_data <= (others=>'0');
+      wait for 12*(Cs_Ck_Period);     
+   end process;
 
-  symbol_stuffer_wrk: entity work.symbol_stuffer   
+   symbol_stuffer_wrk: entity work.symbol_stuffer   
    port map (
              -- Rx
              ckMain => ckCs,
